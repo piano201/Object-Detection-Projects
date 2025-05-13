@@ -1,0 +1,17 @@
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.hero {
+  margin-bottom: 40px;
+}
+
+.upload-box {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.predict-result {
+  font-size: 18px;
+  color: #333;
+}
