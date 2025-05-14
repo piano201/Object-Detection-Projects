@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fish Classifier</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* Glassmorphism effect */
+        .glass {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            transition: background 0.3s ease, border 0.3s ease;
+        }
+        .dark .glass {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        .pulse-hover:hover {
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        /* Wave animation */
+        @keyframes wave {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(-25%); }
+            100% { transform: translateX(0); }
+        }
+        .wave {
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%2366c6f0' fill-opacity='0.7' d='M0,160L48,176C96,192,192,224,288,213.3C384,203,480,149,576,133.3C672,117,768,139,864,160C960,181,1056,203,1152,197.3C1248,192,1344,160,1392,144L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") repeat-x;
+            position: absolute;
+            bottom: 0;
+            width: 200%;
+            height: 120px;
+            animation: wave 12s linear infinite;
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            height: 4px;
+            background: linear-gradient(to right, #38bdf8, #06b6d4);
+            width: 0;
+            transition: width 0.3s ease;
+        }
+
+        /* Particle background */
+        canvas#particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        /* History drawer */
+        .history-drawer {
+            transform: translateX(100%);
+            transition: transform 0.5s ease;
+        }
+        .history-drawer.open {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-gradient-to-br from-blue-900 via-teal-700 to-cyan-600 dark:bg-gradient-to-br dark:from-blue-950 dark:via-teal-900 dark:to-gray-800 transition-colors duration-500">
+    <!-- Particle Background -->
+    <canvas id="particles"></canvas>
+    <!-- Wave Background -->
+    <div class="wave"></div>
+
+    <!-- Theme Toggle -->
+    <button id="themeToggle" class="fixed top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors z-20" title="Toggle Theme">
+        <svg id="sunIcon" class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+        </svg>
+        <svg id="moonIcon" class="w-6 h-6 text-white hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+        </svg>
+    </button>
+
+    <div class="glass rounded-3xl max-w-4xl w-full flex relative z-10">
+        <!-- Main Content -->
+        <div class="w-2/3 p-8">
+            <h1 class="text-4xl font-bold text-white mb-8" style="font-family: 'Playfair Display', serif;">Fish Classifier</h1>
+
+            <!-- Tabs -->
+            <div class="flex space-x-4 mb-8">
+                <button id="uploadTab" class="flex items-center px-4 py-2 text-white border-b-4 border-cyan-300 font-semibold" style="font-family: 'Inter', sans-serif;">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    Upload
+                </button>
+                <button id="webcamTab" class="flex items-center px-4 py-2 text-gray-300 hover:text-white font-semibold" style="font-family: 'Inter', sans-serif;">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                    Webcam
+                </button>
+            </div>
+
+            <!-- Upload Form -->
+            <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data" class="space-y-6">
+                <div class="relative flex items-center justify-center w-full">
+                    <label for="file" class="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-cyan-200 rounded-2xl cursor-pointer bg-white/10 hover:bg-white/20 transition-colors pulse-hover">
+                        <div id="uploadPreview" class="hidden w-full h-full">
+                            <img id="previewImage" class="w-full h-full object-cover rounded-2xl" alt="Image Preview">
+                        </div>
+                        <div id="uploadPlaceholder" class="flex flex-col items-center justify-center pt-6 pb-8">
+                            <svg class="w-14 h-14 mb-4 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                            </svg>
+                            <p class="mb-2 text-sm text-gray-100" style="font-family: 'Inter', sans-serif;"><span class="font-semibold">Upload an image</span> or drag and drop</p>
+                            <p class="text-xs text-gray-300">PNG, JPG, or JPEG (max 5MB)</p>
+                        </div>
+                        <input id="file" name="file" type="file" class="hidden" accept=".png,.jpg,.jpeg" />
+                    </label>
+                </div>
+                <div class="progress-bar" id="progressBar"></div>
+                <button type="submit" class="w-full bg-cyan-500 text-white py-3 rounded-2xl font-semibold hover:bg-cyan-600 transition-colors flex items-center justify-center pulse-hover" style="font-family: 'Inter', sans-serif;">
+                    <span id="uploadButtonText">Classify Fish</span>
+                    <svg id="uploadLoadingSpinner" class="hidden animate-spin h-5 w-5 ml-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8h8a8 8 0 01-8 8 8 8 0 01-8-8z"></path>
+                    </svg>
+                </button>
+            </form>
+
+            <!-- Webcam Interface -->
+            <div id="webcamContainer" class="hidden space-y-6">
+                <div class="relative w-full h-56 bg-gray-100 rounded-2xl overflow-hidden">
+                    <video id="webcam" autoplay class="w-full h-full object-cover"></video>
+                    <canvas id="canvas" class="hidden"></canvas>
+                </div>
+                <div class="flex space-x-4">
+                    <button id="captureButton" class="w-full bg-cyan-500 text-white py-3 rounded-2xl font-semibold hover:bg-cyan-600 transition-colors pulse-hover" style="font-family: 'Inter', sans-serif;">Capture Image</button>
+                    <button id="stopWebcamButton" class="w-full bg-red-500 text-white py-3 rounded-2xl font-semibold hover:bg-red-600 transition-colors pulse-hover" style="font-family: 'Inter', sans-serif;">Stop Webcam</button>
+                </div>
+                <form id="webcamForm" action="/upload" method="post" class="hidden">
+                    <input type="hidden" name="webcam_image" id="webcamImage">
+                </form>
+            </div>
+        </div>
+
+        <!-- Sidebar for Results -->
+        <div class="w-1/3 bg-white/5 p-6 rounded-r-3xl flex flex-col justify-between">
+            <div>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-white" style="font-family: 'Playfair Display', serif;">Results</h2>
+                    <button id="historyToggle" class="text-cyan-300 hover:text-cyan-400 text-sm" style="font-family: 'Inter', sans-serif;">History</button>
+                </div>
+
+                {% if error %}
+                <div class="p-4 bg-red-500/20 text-red-200 rounded-xl text-center fade-in" style="font-family: 'Inter', sans-serif;">{{ error }}</div>
+                {% endif %}
+
+                {% if prediction %}
+                <div class="fade-in">
+                    <img src="{{ image_url }}" alt="Uploaded Fish" class="w-full h-48 object-cover rounded-xl mb-4 border border-cyan-200/30">
+                    <div class="text-center space-y-2">
+                        <p class="text-lg font-semibold text-white" style="font-family: 'Playfair Display', serif;">Prediction: <span class="text-cyan-300">{{ prediction }}</span></p>
+                        <p class="text-sm text-gray-200" style="font-family: 'Inter', sans-serif;">Confidence: <span class="font-medium">{{ confidence }}</span></p>
+                    </div>
+                    <!-- Fish Information -->
+                    <div class="mt-4">
+                        <button id="infoToggle" class="text-cyan-300 hover:text-cyan-400 text-sm" style="font-family: 'Inter', sans-serif;">Show Fish Info</button>
+                        <div id="fishInfo" class="hidden mt-2 text-sm text-gray-200" style="font-family: 'Inter', sans-serif;"></div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-center text-gray-300 text-sm" style="font-family: 'Inter', sans-serif;">Awaiting classification...</p>
+                {% endif %}
+            </div>
+            <!-- Voice Toggle -->
+            <div class="mt-4 flex items-center justify-center">
+                <label class="flex items-center space-x-2 text-sm text-gray-200 cursor-pointer" style="font-family: 'Inter', sans-serif;">
+                    <input id="voiceToggle" type="checkbox" class="hidden" checked>
+                    <span class="w-10 h-5 bg-gray-600 rounded-full relative">
+                        <span class="w-4 h-4 bg-cyan-500 rounded-full absolute top-0.5 transition-transform duration-300" style="left: 21px;"></span>
+                    </span>
+                    <span>Voice Narration</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Drawer -->
+    <div id="historyDrawer" class="history-drawer fixed inset-y-0 right-0 w-full md:w-80 bg-gray-900/95 p-6 custom-scrollbar z-20">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-lg font-semibold text-white" style="font-family: 'Playfair Display', serif;">Classification History</h3>
+            <button id="closeHistory" class="text-cyan-300 hover:text-cyan-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="historyList" class="space-y-4"></div>
+    </div>
+
+    <script>
+        // GSAP Animations
+        gsap.from('.glass', { opacity: 0, y: 30, duration: 0.8, ease: 'power3.out' });
+        gsap.from('h1', { opacity: 0, x: -30, duration: 0.8, delay: 0.2, ease: 'power3.out' });
+
+        // Particle Background
+        function initParticles() {
+            const canvas = document.getElementById('particles');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const particles = [];
+            const particleCount = 50;
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 3 + 1,
+                    speed: Math.random() * 0.5 + 0.1,
+                });
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.fill();
+                    p.y -= p.speed;
+                    if (p.y < 0) p.y = canvas.height;
+                });
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+        window.addEventListener('load', initParticles);
+
+        // Theme Toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const sunIcon = document.getElementById('sunIcon');
+        const moonIcon = document.getElementById('moonIcon');
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark');
+            sunIcon.classList.toggle('hidden');
+            moonIcon.classList.toggle('hidden');
+            localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+        });
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark');
+            sunIcon.classList.add('hidden');
+            moonIcon.classList.remove('hidden');
+        }
+
+        // Tab Switching
+        const uploadTab = document.getElementById('uploadTab');
+        const webcamTab = document.getElementById('webcamTab');
+        const uploadForm = document.getElementById('uploadForm');
+        const webcamContainer = document.getElementById('webcamContainer');
+
+        uploadTab.addEventListener('click', () => {
+            uploadTab.classList.add('text-white', 'border-cyan-300');
+            webcamTab.classList.remove('text-white', 'border-cyan-300');
+            webcamTab.classList.add('text-gray-300');
+            gsap.to(uploadForm, { opacity: 1, display: 'block', duration: 0.4 });
+            gsap.to(webcamContainer, { opacity: 0, display: 'none', duration: 0.4 });
+            stopWebcam();
+        });
+
+        webcamTab.addEventListener('click', () => {
+            webcamTab.classList.add('text-white', 'border-cyan-300');
+            uploadTab.classList.remove('text-white', 'border-cyan-300');
+            uploadTab.classList.add('text-gray-300');
+            gsap.to(uploadForm, { opacity: 0, display: 'none', duration: 0.4 });
+            gsap.to(webcamContainer, { opacity: 1, display: 'block', duration: 0.4 });
+            startWebcam();
+        });
+
+        // Webcam Functionality
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const captureButton = document.getElementById('captureButton');
+        const stopWebcamButton = document.getElementById('stopWebcamButton');
+        const webcamForm = document.getElementById('webcamForm');
+        const webcamImageInput = document.getElementById('webcamImage');
+        let stream = null;
+
+        async function startWebcam() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+            } catch (err) {
+                alert('Failed to access webcam: ' + err.message);
+            }
+        }
+
+        function stopWebcam() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                stream = null;
+            }
+        }
+
+        captureButton.addEventListener('click', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            webcamImageInput.value = canvas.toDataURL('image/jpeg');
+            stopWebcam();
+            webcamForm.submit();
+        });
+
+        stopWebcamButton.addEventListener('click', stopWebcam);
+
+        // Image Preview
+        const fileInput = document.getElementById('file');
+        const uploadPreview = document.getElementById('uploadPreview');
+        const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+        const previewImage = document.getElementById('previewImage');
+
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    previewImage.src = reader.result;
+                    uploadPreview.classList.remove('hidden');
+                    uploadPlaceholder.classList.add('hidden');
+                    gsap.from(previewImage, { opacity: 0, scale: 0.95, duration: 0.4 });
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // History Drawer
+        const historyToggle = document.getElementById('historyToggle');
+        const historyDrawer = document.getElementById('historyDrawer');
+        const closeHistory = document.getElementById('closeHistory');
+        const historyList = document.getElementById('historyList');
+        let history = JSON.parse(localStorage.getItem('classificationHistory')) || [];
+
+        historyToggle.addEventListener('click', () => {
+            historyDrawer.classList.add('open');
+            gsap.to(historyDrawer, { x: 0, duration: 0.5, ease: 'power3.out' });
+        });
+
+        closeHistory.addEventListener('click', () => {
+            historyDrawer.classList.remove('open');
+            gsap.to(historyDrawer, { x: '100%', duration: 0.5, ease: 'power3.in' });
+        });
+
+        function addToHistory(prediction, confidence, imageUrl) {
+            history.unshift({ prediction, confidence, imageUrl });
+            if (history.length > 5) history.pop();
+            localStorage.setItem('classificationHistory', JSON.stringify(history));
+            updateHistoryUI();
+        }
+
+        function updateHistoryUI() {
+            historyList.innerHTML = history.map(item => `
+                <div class="flex items-center space-x-3 p-3 bg-white/10 rounded-lg">
+                    <img src="${item.imageUrl}" class="w-12 h-12 object-cover rounded" alt="History Image">
+                    <div>
+                        <p class="text-sm text-white" style="font-family: 'Inter', sans-serif;">${item.prediction}</p>
+                        <p class="text-xs text-gray-300" style="font-family: 'Inter', sans-serif;">${item.confidence}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        {% if prediction %}
+        addToHistory('{{ prediction }}', '{{ confidence }}', '{{ image_url }}');
+        {% endif %}
+
+        // Fish Information
+        const fishInfoData = {
+            'Bangus': {
+                scientificName: 'Chanos chanos',
+                commonName: 'Milkfish',
+                habitat: 'Coastal waters, estuaries, and brackish ponds; common in the Indo-Pacific.',
+                culinary: 'Popular in Filipino cuisine; often grilled, fried, or cooked in sour broth (sinigang).',
+                funFact: 'Bangus is the national fish of the Philippines, known for its versatility in dishes.'
+            },
+            'Dalagang Bukid': {
+                scientificName: 'Caesio spp.',
+                commonName: 'Yellowtail Fusilier',
+                habitat: 'Coral reefs and rocky coastal areas in the Indo-Pacific.',
+                culinary: 'Often fried or grilled; its vibrant red color makes it a festive dish.',
+                funFact: 'The name means "mountain maiden" in Tagalog, reflecting its bright, attractive appearance.'
+            },
+            'Lapu-Lapu': {
+                scientificName: 'Epinephelus spp.',
+                commonName: 'Grouper',
+                habitat: 'Coral reefs, rocky bottoms, and coastal waters in tropical regions.',
+                culinary: 'Prized for its firm, white flesh; steamed, grilled, or used in soups.',
+                funFact: 'Named after a Filipino hero, Lapu-Lapu fish is a delicacy in high-end restaurants.'
+            },
+            'Tilapia': {
+                scientificName: 'Oreochromis spp.',
+                commonName: 'Tilapia',
+                habitat: 'Freshwater rivers, lakes, and aquaculture ponds; widely farmed.',
+                culinary: 'Versatile; fried, grilled, or baked, often served with sauces.',
+                funFact: 'Tilapia is one of the most farmed fish globally due to its fast growth.'
+            },
+            'Tulingan': {
+                scientificName: 'Auxis spp.',
+                commonName: 'Bullet Tuna or Mackerel Tuna',
+                habitat: 'Open ocean and coastal waters in the Indo-Pacific.',
+                culinary: 'Common in stews like ginataang tulingan (cooked in coconut milk).',
+                funFact: 'Tulingan is a staple in Filipino coastal communities, often preserved by drying.'
+            }
+        };
+
+        const infoToggle = document.getElementById('infoToggle');
+        const fishInfo = document.getElementById('fishInfo');
+        {% if prediction %}
+        const prediction = '{{ prediction }}';
+        if (fishInfoData[prediction]) {
+            fishInfo.innerHTML = `
+                <p><strong>Scientific Name:</strong> ${fishInfoData[prediction].scientificName}</p>
+                <p><strong>Common Name:</strong> ${fishInfoData[prediction].commonName}</p>
+                <p><strong>Habitat:</strong> ${fishInfoData[prediction].habitat}</p>
+                <p><strong>Culinary Uses:</strong> ${fishInfoData[prediction].culinary}</p>
+                <p><strong>Fun Fact:</strong> ${fishInfoData[prediction].funFact}</p>
+            `;
+        } else {
+            fishInfo.innerHTML = '<p>No information available for this fish.</p>';
+        }
+        {% endif %}
+
+        if (infoToggle) {
+            infoToggle.addEventListener('click', () => {
+                const isHidden = fishInfo.classList.contains('hidden');
+                fishInfo.classList.toggle('hidden');
+                infoToggle.textContent = isHidden ? 'Hide Fish Info' : 'Show Fish Info';
+                gsap.from(fishInfo, { opacity: 0, y: 10, duration: 0.4, ease: 'power3.out' });
+            });
+        }
+
+        // Voice Narration
+        const voiceToggle = document.getElementById('voiceToggle');
+        let isVoiceEnabled = voiceToggle.checked;
+
+        voiceToggle.addEventListener('change', () => {
+            isVoiceEnabled = voiceToggle.checked;
+            voiceToggle.nextElementSibling.querySelector('span:last-child').style.left = isVoiceEnabled ? '21px' : '2px';
+        });
+
+        {% if prediction %}
+        function speakResult() {
+            if (!isVoiceEnabled) return;
+            const fish = fishInfoData['{{ prediction }}'] || {};
+            const text = `
+                The fish is classified as {{ prediction }} with a confidence of {{ confidence }}.
+                ${fish.commonName ? `Common name: ${fish.commonName}.` : ''}
+                ${fish.scientificName ? `Scientific name: ${fish.scientificName}.` : ''}
+                ${fish.habitat ? `It is found in ${fish.habitat}.` : ''}
+                ${fish.culinary ? `Culinary uses include ${fish.culinary}.` : ''}
+                ${fish.funFact ? `Fun fact: ${fish.funFact}.` : ''}
+            `;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 1;
+            utterance.volume = 1; // Maximum volume
+            speechSynthesis.speak(utterance);
+        }
+        window.addEventListener('load', speakResult);
+        {% endif %}
+
+        // Loading State
+        const uploadButtonText = document.getElementById('uploadButtonText');
+        const uploadLoadingSpinner = document.getElementById('uploadLoadingSpinner');
+        const progressBar = document.getElementById('progressBar');
+        uploadForm.addEventListener('submit', () => {
+            uploadButtonText.textContent = 'Processing...';
+            uploadLoadingSpinner.classList.remove('hidden');
+            gsap.to(progressBar, { width: '100%', duration: 0.5 });
+        });
+    </script>
+</body>
+</html>
